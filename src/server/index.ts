@@ -2,6 +2,7 @@ import amqp from "amqplib";
 import { publishJSON } from "../internal/pubsub/publish.js";
 import { ExchangePerilDirect, PauseKey } from "../internal/routing/routing.js";
 import type { PlayingState } from "../internal/gamelogic/gamestate.js";
+import { getInput, printServerHelp } from "../internal/gamelogic/gamelogic.js";
 
 async function main() {
   console.log("Starting Peril server...");
@@ -28,12 +29,38 @@ async function main() {
 
 
   const confirmChannel = await conn.createConfirmChannel();
-  const data: PlayingState = { isPaused: true }
-  try {
-    await publishJSON(confirmChannel, ExchangePerilDirect, PauseKey, data);
-  } catch (error) {
-    console.error("Error publishing message:", error);
-  }
+
+  printServerHelp();
+  while (true) {
+    const words = await getInput();
+    if (words.length === 0) {
+      continue;
+    }
+
+    const firstWord = words[0];
+
+    if (firstWord === "pause") {
+      console.log("Sending pause message")
+      try {
+        await publishJSON(confirmChannel, ExchangePerilDirect, PauseKey, { isPaused: true });
+      } catch (error) {
+        console.error("Error publishing message:", error);
+      }
+    } else if (firstWord === "resume") {
+      console.log("Sending resume message")
+      try {
+        await publishJSON(confirmChannel, ExchangePerilDirect, PauseKey, { isPaused: false });
+      } catch (error) {
+        console.error("Error publishing message:", error);
+      }
+    } else if (firstWord === "quit") {
+      console.log("Exiting...")
+      break;
+    } else {
+      console.log("Invalid command")
+    }
+
+  };
 }
 
 main().catch((err) => {
