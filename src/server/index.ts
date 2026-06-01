@@ -55,7 +55,7 @@ async function main() {
       }
     } else if (firstWord === "quit") {
       console.log("Exiting...")
-      break;
+      process.exit(0);
     } else {
       console.log("Invalid command")
     }
