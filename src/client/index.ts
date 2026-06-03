@@ -7,12 +7,14 @@ import { commandSpawn } from "../internal/gamelogic/spawn.js";
 import { commandMove } from "../internal/gamelogic/move.js";
 import { subscribeJSON } from "../internal/pubsub/consume.js";
 import { handlerPause } from "./handlers.js";
+import { publishJSON } from "../internal/pubsub/publish.js";
 
 async function main() {
   console.log("Starting Peril client...");
 
   const rabbitConnString = "amqp://guest:guest@localhost:5672/";
   const conn = await amqp.connect(rabbitConnString);
+  const confirmChannel = await conn.createConfirmChannel();
 
   if (conn) {
     console.log("Connected to RabbitMQ");
@@ -34,6 +36,8 @@ async function main() {
   const userName = await clientWelcome();
   const gameState = new GameState(userName);
 
+
+  await subscribeJSON(conn, ExchangePerilTopic, `army_moves.${userName}`, "army_moves.*", SimpleQueueType.Transient, handlerPause(gameState));
   await subscribeJSON(conn, ExchangePerilDirect, `pause.${userName}`, PauseKey, SimpleQueueType.Transient, handlerPause(gameState));
 
   while (true) {
@@ -53,9 +57,8 @@ async function main() {
     } else if (command === "move") {
       try {
         const move = commandMove(gameState, words);
-        if (move) {
-          console.log("Move worked")
-        }
+        await publishJSON(confirmChannel, ExchangePerilTopic, `army_moves.${userName}`, move)
+
       } catch (error) {
         console.error("Error moving unit:", error);
       }
