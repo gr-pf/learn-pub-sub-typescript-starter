@@ -32,9 +32,9 @@ export function handlerMove(gs: GameState, ch: ConfirmChannel): (move: ArmyMove)
                                 defender: gs.getPlayerSnap(),
                             }
                         )
+                        return AckType.Ack
                     } catch (error) {
                         console.error("Error publishing war recognition:", error);
-                    } finally {
                         return AckType.NackRequeue
                     }
 
