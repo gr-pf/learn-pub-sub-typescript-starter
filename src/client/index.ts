@@ -1,13 +1,14 @@
-import amqp from "amqplib";
+import amqp, { type Channel, type ConfirmChannel } from "amqplib";
 import { clientWelcome, commandStatus, getInput, printClientHelp, printQuit } from "../internal/gamelogic/gamelogic.js";
 import { declareAndBind, SimpleQueueType } from "../internal/pubsub/consume.js";
-import { ExchangePerilDirect, ExchangePerilTopic, PauseKey, WarRecognitionsPrefix } from "../internal/routing/routing.js";
+import { ExchangePerilDirect, ExchangePerilTopic, GameLogSlug, PauseKey, WarRecognitionsPrefix } from "../internal/routing/routing.js";
 import { GameState } from "../internal/gamelogic/gamestate.js";
 import { commandSpawn } from "../internal/gamelogic/spawn.js";
 import { commandMove } from "../internal/gamelogic/move.js";
 import { subscribeJSON } from "../internal/pubsub/consume.js";
 import { handlerMove, handlerPause, handlerWar } from "./handlers.js";
-import { publishJSON } from "../internal/pubsub/publish.js";
+import { publishJSON, publishMsgPack } from "../internal/pubsub/publish.js";
+import type { GameLog } from "../internal/gamelogic/logs.js";
 
 async function main() {
   console.log("Starting Peril client...");
@@ -39,7 +40,7 @@ async function main() {
 
   await subscribeJSON(conn, ExchangePerilTopic, `army_moves.${userName}`, "army_moves.*", SimpleQueueType.Transient, handlerMove(gameState, confirmChannel));
   await subscribeJSON(conn, ExchangePerilDirect, `pause.${userName}`, PauseKey, SimpleQueueType.Transient, handlerPause(gameState));
-  await subscribeJSON(conn, ExchangePerilTopic, WarRecognitionsPrefix, `${WarRecognitionsPrefix}.*`, SimpleQueueType.Durable, handlerWar(gameState));
+  await subscribeJSON(conn, ExchangePerilTopic, WarRecognitionsPrefix, `${WarRecognitionsPrefix}.*`, SimpleQueueType.Durable, handlerWar(gameState, confirmChannel));
 
   while (true) {
     const words = await getInput();
@@ -82,3 +83,16 @@ main().catch((err) => {
   console.error("Fatal error:", err);
   process.exit(1);
 });
+
+
+export function publishGameLog(channel: ConfirmChannel, username: string, message: string) {
+
+  const gameLog: GameLog = {
+    username,
+    message,
+    currentTime: new Date()
+  }
+
+  return publishMsgPack(channel, ExchangePerilTopic, `${GameLogSlug}.${username}`, gameLog)
+
+}

@@ -4,9 +4,10 @@ import type { GameState, PlayingState } from "../internal/gamelogic/gamestate.js
 import { handleMove, MoveOutcome } from "../internal/gamelogic/move.js";
 import { handlePause } from "../internal/gamelogic/pause.js";
 import { AckType } from "../internal/pubsub/consume.js";
-import { publishJSON } from "../internal/pubsub/publish.js";
+import { publishJSON, publishMsgPack } from "../internal/pubsub/publish.js";
 import { ExchangePerilTopic, WarRecognitionsPrefix } from "../internal/routing/routing.js";
-import { handleWar, WarOutcome } from "../internal/gamelogic/war.js";
+import { handleWar, WarOutcome, type WarResolution } from "../internal/gamelogic/war.js";
+import { publishGameLog } from "./index.js";
 
 export function handlerPause(gs: GameState): (ps: PlayingState) => AckType {
     return (ps: PlayingState): AckType => {
@@ -51,10 +52,17 @@ export function handlerMove(gs: GameState, ch: ConfirmChannel): (move: ArmyMove)
     }
 };
 
-export function handlerWar(gs: GameState): (rw: RecognitionOfWar) => AckType {
+export function handlerWar(gs: GameState, ch: ConfirmChannel): (rw: RecognitionOfWar) => AckType {
     return (rw: RecognitionOfWar): AckType => {
         try {
-            const warOutcome = handleWar(gs, rw);
+            const warOutcome: WarResolution = handleWar(gs, rw);
+            let message: string = "";
+            if (warOutcome.result === WarOutcome.OpponentWon || warOutcome.result === WarOutcome.YouWon) {
+                message = `${warOutcome.winner} won a war against ${warOutcome.loser}`;
+            } else if (warOutcome.result === WarOutcome.Draw) {
+                message = `A war between ${warOutcome.attacker} and ${warOutcome.defender} resulted in a draw`;
+            }
+
             switch (warOutcome.result) {
                 case WarOutcome.NotInvolved:
                     return AckType.NackRequeue
@@ -65,7 +73,13 @@ export function handlerWar(gs: GameState): (rw: RecognitionOfWar) => AckType {
                 case WarOutcome.OpponentWon:
                 case WarOutcome.YouWon:
                 case WarOutcome.Draw:
-                    return AckType.Ack
+                    try {
+                        publishGameLog(ch, gs.getUsername(), message)
+                        return AckType.Ack
+                    } catch (err) {
+                        console.error("Error publishing game log:", err);
+                        return AckType.NackRequeue
+                    }
 
                 default:
                     console.error("Error");
