@@ -34,7 +34,7 @@ export async function publishMsgPack<T>(
     value: T,
 ): Promise<void> {
 
-    const encoded: Uint8Array = encode({ foo: "bar" });
+    const encoded: Uint8Array = encode(value);
 
     const content: Buffer = Buffer.from(encoded.buffer, encoded.byteOffset, encoded.byteLength);
 

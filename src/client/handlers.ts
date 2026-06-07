@@ -4,7 +4,7 @@ import type { GameState, PlayingState } from "../internal/gamelogic/gamestate.js
 import { handleMove, MoveOutcome } from "../internal/gamelogic/move.js";
 import { handlePause } from "../internal/gamelogic/pause.js";
 import { AckType } from "../internal/pubsub/consume.js";
-import { publishJSON, publishMsgPack } from "../internal/pubsub/publish.js";
+import { publishJSON } from "../internal/pubsub/publish.js";
 import { ExchangePerilTopic, WarRecognitionsPrefix } from "../internal/routing/routing.js";
 import { handleWar, WarOutcome, type WarResolution } from "../internal/gamelogic/war.js";
 import { publishGameLog } from "./index.js";
@@ -91,3 +91,5 @@ export function handlerWar(gs: GameState, ch: ConfirmChannel): (rw: RecognitionO
         }
     }
 }
+
+

@@ -1,4 +1,5 @@
 import amqp, { type Channel } from "amqplib";
+import { decode } from "@msgpack/msgpack";
 
 export enum SimpleQueueType {
     Durable,
@@ -83,3 +84,56 @@ export async function subscribeJSON<T>(
         }
     })
 };
+
+export async function subscribeMsgPack<T>(
+    conn: amqp.ChannelModel,
+    exchange: string,
+    queueName: string,
+    key: string,
+    queueType: SimpleQueueType,
+    handler: (data: T) => AckType | Promise<AckType>,
+): Promise<void> {
+
+    const [channel, queue] = await declareAndBind(conn, exchange, queueName, key, queueType);
+
+    await channel.consume(queue.queue, async (message: amqp.ConsumeMessage | null) => {
+        if (message === null) {
+            return;
+        }
+
+        let data: T;
+
+        try {
+            data = decode(message.content) as T;
+        } catch (err) {
+            console.error("Error: ", err);
+            return;
+        }
+
+        try {
+            const result = await handler(data);
+            switch (result) {
+                case AckType.Ack:
+                    channel.ack(message);
+
+                    break;
+                case AckType.NackDiscard:
+                    channel.nack(message, false, false);
+
+                    break;
+                case AckType.NackRequeue:
+                    channel.nack(message, false, true);
+
+                    break;
+                default:
+                    const unreachable: never = result;
+                    console.error("Unexpected ack type:", unreachable);
+                    return;
+            }
+        } catch (err) {
+            console.error("Error handling message:", err);
+            channel.nack(message, false, false);
+            return;
+        }
+    })
+}
