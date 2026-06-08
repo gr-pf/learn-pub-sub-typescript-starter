@@ -42,6 +42,7 @@ export async function subscribeJSON<T>(
 ): Promise<void> {
 
     const [channel, queue] = await declareAndBind(conn, exchange, queueName, key, queueType);
+    await channel.prefetch(1);
 
     await channel.consume(queue.queue, async (message: amqp.ConsumeMessage | null) => {
         if (message === null) {
@@ -95,6 +96,7 @@ export async function subscribeMsgPack<T>(
 ): Promise<void> {
 
     const [channel, queue] = await declareAndBind(conn, exchange, queueName, key, queueType);
+    await channel.prefetch(1);
 
     await channel.consume(queue.queue, async (message: amqp.ConsumeMessage | null) => {
         if (message === null) {

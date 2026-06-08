@@ -1,5 +1,5 @@
 import amqp, { type ConfirmChannel } from "amqplib";
-import { clientWelcome, commandStatus, getInput, printClientHelp, printQuit } from "../internal/gamelogic/gamelogic.js";
+import { clientWelcome, commandStatus, getInput, getMaliciousLog, printClientHelp, printQuit } from "../internal/gamelogic/gamelogic.js";
 import { SimpleQueueType } from "../internal/pubsub/consume.js";
 import { ExchangePerilDirect, ExchangePerilTopic, GameLogSlug, PauseKey, WarRecognitionsPrefix } from "../internal/routing/routing.js";
 import { GameState } from "../internal/gamelogic/gamestate.js";
@@ -70,7 +70,32 @@ async function main() {
     } else if (command === "help") {
       printClientHelp();
     } else if (command === "spam") {
-      console.log("Spamming not allowed yet!");
+      if (words.length < 2) {
+        throw new Error("Command spam missing argument");
+      }
+      const raw = words[1];
+      if (!raw) {
+        console.log("usage: spam <n>");
+        continue;
+      }
+      const iter = parseInt(raw, 10);
+      if (isNaN(iter)) {
+        console.log(`error: ${words[1]} is not a valid number`);
+        continue;
+      }
+      for (let i = 0; i < iter; i++) {
+        try {
+          await publishGameLog(confirmChannel, gameState.getUsername(), getMaliciousLog());
+        } catch (err) {
+          console.error(
+            "Failed to publish spam message:",
+            (err as Error).message,
+          );
+          continue;
+        }
+      }
+
+      //console.log("Spamming not allowed yet!");
     } else if (command === "quit") {
       printQuit();
       process.exit(0);
